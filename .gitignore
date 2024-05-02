@@ -1,3 +1,16 @@
 /cache/*
 /__pycache__
+
+# Virtualenv
+venv/
+ENV/
+env/
+
+# VS Code
+.vscode/
+
+# DS_Store
 .DS_Store
+
+# Keys and tokens
+.hf_token

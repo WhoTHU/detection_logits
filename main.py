@@ -15,7 +15,11 @@ import configs
 device = torch.device(configs.device)
 ########## Load model
 collections = prepare_model(configs.model_configs, configs.hf_token, device)
+model_name = configs.model_configs['target']['name'] # 'llama-3', 'mistral-7b', etc.
 ########## Load and prepare dataset
+data_dir = os.path.join(configs.dataset_configs['logits_dir'], model_name) # './cache' - TODO: maybe rename this?
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
 datas_tt = prepare_data(configs.dataset_configs, configs.hf_token, collections)
 ########## Regression
 split_name = 'train' # train, test
@@ -54,7 +58,7 @@ train_loader = DataLoader(train_data, batch_size=128)
 mean_fixed = results_tt.mean(0)
 std_fixed = results_tt.std(0)
 
-n_inputs = 32000
+n_inputs = collections.target.model.lm_head.out_features
 n_outputs = 1
 log_regr = LogisticRegression(n_inputs, n_outputs, normalization=(mean_fixed, std_fixed)).to(device)
 ### unbalanced sample weights
@@ -78,8 +82,8 @@ for epoch in range(epochs):
         optimizer.step()
     losses.append(loss.item())
 losses = np.array(losses)
-np.save('./cache/losses.npy', losses)
-torch.save(log_regr.state_dict(), './cache/regression.pt')
+np.save(os.path.join(data_dir, 'losses.npy'), losses)
+torch.save(log_regr.state_dict(), os.path.join(data_dir, 'regression.pt'))
 
 # ########## Plot train
 # print(f"Epoch: {epoch}")
@@ -125,8 +129,8 @@ scores_split = [r2, r1]
 FPR = np.linspace(0, 1, 1001)
 ths = (1e-1, 1e-2, 1e-3, 1e-4)
 metrics = computeMetrics(scores_split, FPR, ths)
-np.save('./cache/metrics', metrics)
-np.savez('./cache/scores_split', r1=r1, r2=r2)
+np.save(os.path.join(data_dir, 'metrics'), metrics)
+np.savez(os.path.join(data_dir, 'scores_split'), r1=r1, r2=r2)
 
 y_score = np.concatenate(scores_split)
 y_test = np.concatenate([np.ones_like(scores_split[0]), np.zeros_like(scores_split[1])])

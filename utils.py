@@ -56,7 +56,7 @@ def prepare_data(configs, token, collections):
             
             content = [d['user_input'] for d in datas]
 
-            logits_path = os.path.join(configs['logits_dir'], f"toxic-chat/results_first_logits_{split_name}.pts")
+            logits_path = os.path.join(configs['logits_dir'], collections.target.name, f"toxic-chat/results_first_logits_{split_name}.pts")
             if not os.path.exists(logits_path):
                 prepare_logits(configs, dataset, collections)
             results_tt = torch.load(logits_path)
@@ -76,7 +76,7 @@ def prepare_data(configs, token, collections):
         else:
             dataset = load_dataset("lmsys/lmsys-chat-1m", token=token)
 
-        logits_path = os.path.join(configs['logits_dir'], "lmsys-chat-1m/results_first_logits_0to20000.pts")
+        logits_path = os.path.join(configs['logits_dir'], collections.target.name, "lmsys-chat-1m/results_first_logits_0to20000.pts")
         if not os.path.exists(logits_path):
             prepare_logits(configs, dataset, collections)
         results_tt = torch.load(logits_path)
@@ -130,7 +130,7 @@ def prepare_data(configs, token, collections):
         return datas_tt
 
     else:
-        raise NotImplementederror
+        raise NotImplementedError
     
     
 def computeMetrics(scores, FPR, ths=(1e-3, 1e-4, 1e-5)):
@@ -207,7 +207,7 @@ def prepare_logits(configs, dataset, collections):
 
             results = torch.stack(results)
             
-            logits_path = os.path.join(configs['logits_dir'], f"toxic-chat/results_first_logits_{split_name}.pts")
+            logits_path = os.path.join(configs['logits_dir'], target_collection.name, f"toxic-chat/results_first_logits_{split_name}.pts")
             if not os.path.exists(os.path.dirname(logits_path)):
                 os.makedirs(os.path.dirname(logits_path))
             torch.save(results, logits_path)
@@ -235,10 +235,10 @@ def prepare_logits(configs, dataset, collections):
             results.append(l.detach().cpu())
             
         results = torch.stack(results)
-        logits_path = os.path.join(configs['logits_dir'], "lmsys-chat-1m/results_first_logits_0to20000.pts")
+        logits_path = os.path.join(configs['logits_dir'], target_collection.name, "lmsys-chat-1m/results_first_logits_0to20000.pts")
         if not os.path.exists(os.path.dirname(logits_path)):
             os.makedirs(os.path.dirname(logits_path))
         torch.save(results, logits_path)
 
     else:
-        raise NotImplementederror
+        raise NotImplementedError
