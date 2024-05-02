@@ -27,6 +27,16 @@ content = datas_tt[split_name]['content']
 y_toxicity = datas_tt[split_name]['toxicity_label']
 results_tt = datas_tt[split_name]['logits']
 
+EPOCHS = 200
+BATCH_SIZE = 32
+LEARNING_RATE = 5e-4 #4e-3 for logits, 5e-4 for logp/1-p
+L1_REG = 1e-3
+TRAIN_NUM = datas_tt.train.toxicity_label.shape[0]
+TEST_NUM = datas_tt.test.toxicity_label.shape[0]
+params_repr = f"E{EPOCHS}_B{BATCH_SIZE}_LR{'{:.1e}'.format(LEARNING_RATE)}_L1R{'{:.1e}'.format(L1_REG)}_TRN{TRAIN_NUM}_TEST{TEST_NUM}"
+if not os.path.exists(os.path.join(data_dir, params_repr)):
+    os.makedirs(os.path.join(data_dir, params_repr))
+
 def get_feature(results_tt):
     results_tt = results_tt.softmax(1)
 #     results_tt = results_tt.log()
@@ -55,7 +65,7 @@ class LogisticRegression(torch.nn.Module):
         return y_pred
 
 train_data = TensorDataset(results_tt, y_toxicity.float())
-train_loader = DataLoader(train_data, batch_size=128)
+train_loader = DataLoader(train_data, batch_size=BATCH_SIZE)
 mean_fixed = results_tt.mean(0)
 std_fixed = results_tt.std(0)
 
@@ -65,26 +75,25 @@ log_regr = LogisticRegression(n_inputs, n_outputs, normalization=(mean_fixed, st
 ### unbalanced sample weights
 pos_weight = y_toxicity.logical_not().sum() / y_toxicity.sum()
 
-optimizer = torch.optim.SGD(log_regr.parameters(), lr=5e-4) #4e-3 for logits, 5e-4 for logp/1-p
+optimizer = torch.optim.SGD(log_regr.parameters(), lr=LEARNING_RATE)
 # optimizer = torch.optim.Adam(log_regr.parameters(), lr=0.001)
 
-epochs = 200
 losses = []
-for epoch in range(epochs):
-    for i, (x, y) in tqdm(enumerate(train_loader)):
+for epoch in tqdm(range(EPOCHS)):
+    for i, (x, y) in enumerate(train_loader):
         x, y  = x.to(device), y.to(device)
         optimizer.zero_grad()
         outputs = log_regr(x)[..., 0]
         loss = F.binary_cross_entropy_with_logits(outputs, y, pos_weight=pos_weight)
         paras = torch.cat([p.view(-1) for p in log_regr.linear.parameters()])
-        loss = loss + 1e-3 * torch.norm(paras, 1) # L1 loss
+        loss = loss + L1_REG * torch.norm(paras, 1) # L1 loss
 #         loss = loss + 1e-1 * torch.norm(paras, 2)
         loss.backward()
         optimizer.step()
     losses.append(loss.item())
 losses = np.array(losses)
-np.save(os.path.join(data_dir, 'losses.npy'), losses)
-torch.save(log_regr.state_dict(), os.path.join(data_dir, 'regression.pt'))
+np.save(os.path.join(data_dir, params_repr, 'losses.npy'), losses)
+torch.save(log_regr.state_dict(), os.path.join(data_dir, params_repr, 'regression.pt'))
 
 # ########## Plot train
 # print(f"Epoch: {epoch}")
@@ -119,9 +128,19 @@ y_toxicity = datas_tt[split_name]['toxicity_label']
 results_tt = datas_tt[split_name]['logits']
 
 results_tt = get_feature(results_tt)
-results = log_regr(results_tt.to(device))[..., 0].detach().cpu()
-# results = results_tt[:, 306] # logits
-# results = results_tt[:, 8221] # logits
+
+# Split the results into batches
+num_batches = (results_tt.shape[0] + BATCH_SIZE - 1) // BATCH_SIZE
+
+results = []
+for i in range(num_batches):
+    start_idx = i * BATCH_SIZE
+    end_idx = min((i + 1) * BATCH_SIZE, results_tt.shape[0])
+    batch_results = results_tt[start_idx:end_idx].to(device)
+    batch_outputs = log_regr(batch_results)[..., 0].detach().cpu()
+    results.append(batch_outputs)
+
+results = torch.cat(results)
 
 r1 = results[y_toxicity.logical_not()].numpy()
 r2 = results[y_toxicity].numpy()
@@ -130,8 +149,8 @@ scores_split = [r2, r1]
 FPR = np.linspace(0, 1, 1001)
 ths = (1e-1, 1e-2, 1e-3, 1e-4)
 metrics = computeMetrics(scores_split, FPR, ths)
-np.save(os.path.join(data_dir, 'metrics'), metrics)
-np.savez(os.path.join(data_dir, 'scores_split'), r1=r1, r2=r2)
+np.save(os.path.join(data_dir, params_repr, 'metrics'), metrics)
+np.savez(os.path.join(data_dir, params_repr, 'scores_split'), r1=r1, r2=r2)
 
 y_score = np.concatenate(scores_split)
 y_test = np.concatenate([np.ones_like(scores_split[0]), np.zeros_like(scores_split[1])])
@@ -140,6 +159,10 @@ precision, recall, thresholds = precision_recall_curve(y_test, y_score)
 auprc = auc(recall, precision)
 
 print(f"AUPRC is {auprc}")
+
+# Print parameters
+print(f"Epochs: {EPOCHS}, Batch size: {BATCH_SIZE}, Learning rate: {LEARNING_RATE}, L1 regularization: {L1_REG}")
+print(f"Train size: {TRAIN_NUM}, Test size: {TEST_NUM}")
 
 # ########## Plot test
 # plt.figure(figsize=(12, 7.5))

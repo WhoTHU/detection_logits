@@ -5,7 +5,7 @@ if os.path.exists('.hf_token'):
     with open('.hf_token', 'r') as f:
         hf_token = f.read().strip()
 
-device = 'cuda:1'
+device = 'cuda:3'
 
 ALL_MODEL_CONFIGS = {
     'llama-2': {
@@ -47,7 +47,7 @@ dataset_configs = {
     ########## lmsys-chat-1m
     'name': 'lmsys-chat-1m', # toxic-chat, lmsys-chat-1m
     'path': None, # local path
-    'select': 10000, # use the first several examples
+    'select': 20000, # use the first several examples
     'logits_dir': './cache',
 }
 
