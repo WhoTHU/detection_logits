@@ -30,7 +30,8 @@ results_tt = datas_tt[split_name]['logits']
 def get_feature(results_tt):
     results_tt = results_tt.softmax(1)
 #     results_tt = results_tt.log()
-    results_tt = results_tt.log() - (1 - results_tt).log()
+    # Bound away from 0 and 1 to avoid numerical instability
+    results_tt = torch.clamp(results_tt, min=1e-16).log() - torch.clamp(1 - results_tt, min=1e-16).log()
 #     x = torch.zeros_like(results_tt)
 #     idx = results_tt.topk(1000, 1)[1]
 #     t = results_tt.gather(1, idx)

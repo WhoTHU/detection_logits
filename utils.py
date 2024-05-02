@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score as roc_auc
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
 from datasets import load_dataset
 from easydict import EasyDict
 from tqdm.auto import tqdm
@@ -17,7 +17,14 @@ def prepare_model(configs, token, device):
         if isinstance(configs[key], str) and (configs[key] in configs.keys()):
             collections[key] = collections[configs[key]]
         elif isinstance(configs[key], dict):
-            model = AutoModelForCausalLM.from_pretrained(configs[key]['path'], torch_dtype=torch.float16, device_map=device, token=token).eval()
+            model_path = configs[key]['path']
+            if 'Mistral-7B-Instruct-v0.2' in model_path:
+                # See https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2/discussions/56
+                model_config = AutoConfig.from_pretrained(model_path)
+                model_config.update({'sliding_window': 4096})
+                model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map=device, token=token, config=model_config).eval()
+            else:
+                model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map=device, token=token).eval()
             use_fast_tokenizer = "LlamaForCausalLM" not in model.config.architectures
             tokenizer = AutoTokenizer.from_pretrained(configs[key]['path'], padding_side='left', use_fast=use_fast_tokenizer, token=token)
     #         tokenizer.pad_token = tokenizer.eos_token

@@ -31,7 +31,7 @@ ALL_MODEL_CONFIGS = {
 }
 
 model_configs = {
-    'target': ALL_MODEL_CONFIGS['llama-2']
+    'target': ALL_MODEL_CONFIGS['mistral-7b']
     # 'judgement': {
     #     'name': 'llamaguard',
     #     'path': 'meta-llama/LlamaGuard-7b',
