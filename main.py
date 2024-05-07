@@ -27,10 +27,10 @@ content = datas_tt[split_name]['content']
 y_toxicity = datas_tt[split_name]['toxicity_label']
 results_tt = datas_tt[split_name]['logits']
 
-EPOCHS = 200
+EPOCHS = 384
 BATCH_SIZE = 32
-LEARNING_RATE = 5e-4 #4e-3 for logits, 5e-4 for logp/1-p
-L1_REG = 1e-3
+LEARNING_RATE = 4e-4 #4e-3 for logits, 5e-4 for logp/1-p
+L1_REG = 4e-4
 TRAIN_NUM = datas_tt.train.toxicity_label.shape[0]
 TEST_NUM = datas_tt.test.toxicity_label.shape[0]
 params_repr = f"E{EPOCHS}_B{BATCH_SIZE}_LR{'{:.1e}'.format(LEARNING_RATE)}_L1R{'{:.1e}'.format(L1_REG)}_TRN{TRAIN_NUM}_TEST{TEST_NUM}"
@@ -38,7 +38,9 @@ if not os.path.exists(os.path.join(data_dir, params_repr)):
     os.makedirs(os.path.join(data_dir, params_repr))
 
 def get_feature(results_tt):
-    results_tt = results_tt.softmax(1)
+    if len(results_tt.shape) == 1:
+        results_tt = results_tt.unsqueeze(1)
+    results_tt = results_tt.to(torch.float32).softmax(1)
 #     results_tt = results_tt.log()
     # Bound away from 0 and 1 to avoid numerical instability
     results_tt = torch.clamp(results_tt, min=1e-16).log() - torch.clamp(1 - results_tt, min=1e-16).log()
@@ -53,14 +55,17 @@ results_tt = get_feature(results_tt)
 from torch.utils.data import TensorDataset, DataLoader
 
 class LogisticRegression(torch.nn.Module):    
-    def __init__(self, n_inputs, n_outputs, normalization=[None, None]):
+    def __init__(self, n_inputs, n_outputs, normalization=[None, None], min_std=1e-10):
         super(LogisticRegression, self).__init__()
         self.linear = torch.nn.Linear(n_inputs, n_outputs)
+        self.min_std = min_std
         self.register_buffer('mean', normalization[0])
-        self.register_buffer('std', normalization[1] + 1e-10)
+        self.register_buffer('std', normalization[1] + min_std)
     def forward(self, x):
         if self.mean is not None:
             x = (x - self.mean) / self.std
+        # Ignore deterministic tokens
+        x = x * (self.std > self.min_std)
         y_pred = self.linear(x)
         return y_pred
 

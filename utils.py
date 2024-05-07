@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score as roc_auc
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, AutoModelForSeq2SeqLM
 from datasets import load_dataset
 from easydict import EasyDict
 from tqdm.auto import tqdm
@@ -23,6 +23,12 @@ def prepare_model(configs, token, device):
                 model_config = AutoConfig.from_pretrained(model_path)
                 model_config.update({'sliding_window': 4096})
                 model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map=device, token=token, config=model_config).eval()
+            elif 'gpt2' in model_path:
+                model_config = AutoConfig.from_pretrained(model_path)
+                # model_config.update({'n_positions': 4096})
+                model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map=device, token=token, config=model_config).eval()
+            elif 'flan-t5' in model_path:
+                model = AutoModelForSeq2SeqLM.from_pretrained(model_path, device_map=device, token=token).eval()
             else:
                 model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map=device, token=token).eval()
             use_fast_tokenizer = "LlamaForCausalLM" not in model.config.architectures
@@ -87,6 +93,7 @@ def prepare_data(configs, token, collections):
         if not os.path.exists(logits_path):
             prepare_logits(configs, dataset, collections)
         results_tt = torch.load(logits_path)
+        results_tt = results_tt.squeeze()
 
         select = configs['select']
         dataset_sub = dataset['train'][:select]
@@ -131,9 +138,14 @@ def prepare_data(configs, token, collections):
                 'toxicity_label': y_toxicity,
                 'full_label': y_full,
                 'full_score': y_score,
+                'sentence_ids': train_ids if split_name == 'train' else test_ids,
         #         'jailbreaking_label': y_jailbreaking,
                 'logits': results_tt[:select][torch.from_numpy(split_ids[split_name])],
             })
+        train_test_ids_path = os.path.join(configs['logits_dir'], collections.target.name, f"lmsys-chat-1m/train_test_ids.npz")
+        if not os.path.exists(train_test_ids_path):
+            os.makedirs(os.path.dirname(train_test_ids_path), exist_ok=True)
+        np.savez(train_test_ids_path, train_ids=train_ids, test_ids=test_ids)
         return datas_tt
 
     else:
@@ -234,14 +246,21 @@ def prepare_logits(configs, dataset, collections):
             x_init = conv.get_prompt()
             x = x_init + ' '
 
-            input_ids = torch.tensor(tokenizer(x)['input_ids']).unsqueeze(0).to(model.device)
-            input_ids_m = input_ids
-            logits = model(input_ids=input_ids_m).logits
+            input_ids = torch.tensor(tokenizer(x, truncation=True, max_length=1024)['input_ids']).unsqueeze(0).to(model.device)
+            model_inputs = model.prepare_inputs_for_generation(input_ids)
+            if 'flan-t5' in target_collection.name:
+                generation = model.generate(input_ids=input_ids, max_new_tokens=1, output_scores=True, return_dict_in_generate=True)
+                logits = generation.scores[0]
+            elif 'gpt2' in target_collection.name:
+                logits = model(input_ids=input_ids).logits[0, -1]
+                # generation = model.generate(input_ids=input_ids, use_cache=None, position_ids=None, attention_mask=None, max_new_tokens=1, output_scores=True, return_dict_in_generate=True)
+                # logits = generation.scores[0]
+            else:
+                logits = model(input_ids=input_ids).logits[0, -1]
 
-            l = logits[0, -1]
-            results.append(l.detach().cpu())
+            results.append(logits.detach().cpu())
             
-        results = torch.stack(results)
+        results = torch.stack(results).squeeze()
         logits_path = os.path.join(configs['logits_dir'], target_collection.name, "lmsys-chat-1m/results_first_logits_0to20000.pts")
         if not os.path.exists(os.path.dirname(logits_path)):
             os.makedirs(os.path.dirname(logits_path))
