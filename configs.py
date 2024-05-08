@@ -1,8 +1,6 @@
 import os
 from abc import ABC, abstractmethod
 
-device = 'cuda:3'
-
 class DetectionModelConfig(ABC):
     def __init__(self, name, hf_path: str = None, local_path: str = None,
                  epochs: int = 512, batch_size: int = 32, learning_rate: float = 5e-4,
@@ -10,7 +8,7 @@ class DetectionModelConfig(ABC):
         self.name = name
         self.hf_path = hf_path
         self.local_path = local_path
-        self.path = local_path if local_path is not None else hf_path
+        self.path = local_path if local_path is not None and os.path.exists(local_path) else hf_path
         if self.path is None:
             raise ValueError('Either hf_path or local_path must be provided')
         self.epochs = epochs
