@@ -18,7 +18,7 @@ from fastchat.model import get_conversation_template
 def _load_distributed_hf(raw_config, devices, hf_token=None):
     model_name = raw_config.name
     model_path = raw_config.path
-    model_dtype = torch.float32 if 'flan-t5' in model_name else torch.bfloat16
+    model_dtype = torch.float32 if 'flan-t5' in model_path.lower() else torch.float16
 
     # Setup model config and memory map
     gpu_count = len(devices)
@@ -70,12 +70,20 @@ def _load_distributed_hf(raw_config, devices, hf_token=None):
             max_memory=max_memory,
         )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        device_map=device_map,
-        torch_dtype=model_dtype,
-        token=hf_token,
-    )
+    if 'flan-t5' in model_path.lower():
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_path,
+            device_map=device_map,
+            torch_dtype=model_dtype,
+            token=hf_token,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            device_map=device_map,
+            torch_dtype=model_dtype,
+            token=hf_token,
+        )
 
     return model
 
@@ -90,22 +98,21 @@ def prepare_model(configs, token, devices):
     if devices is not None and not isinstance(devices, list):
         devices = [devices]
     
-    if 'Mistral-7B-Instruct-v0.2' in model_path.lower():
-        # Manual setting of sliding window
-        # See https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2/discussions/56
-        model_config = AutoConfig.from_pretrained(model_path)
-        model_config.update({'sliding_window': 4096})
-        model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=torch.device(devices[0]), token=token, config=model_config).eval()
-    # elif 'gpt2' in model_path:
-    #     model_config = AutoConfig.from_pretrained(model_path)
-    #     # model_config.update({'n_positions': 4096})
-    #     model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, device_map=device, token=token, config=model_config).eval()
-    elif 'flan-t5' in model_path.lower():
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=torch.device(devices[0]), token=token).eval()
-    elif 'llama-2-13b' in model_path.lower():
-        model = _load_distributed_hf(configs, devices, hf_token=token)
+    if devices is None or len(devices) == 1:
+        device_map = torch.device(devices[0]) if devices is not None else torch.device("cpu")
+        if 'Mistral-7B-Instruct-v0.2' in model_path.lower():
+            # Manual setting of sliding window
+            # See https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2/discussions/56
+            model_config = AutoConfig.from_pretrained(model_path)
+            model_config.update({'sliding_window': 4096})
+            model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token, config=model_config).eval()
+        elif 'flan-t5' in model_path.lower():
+            # Not supported with AutoModelForCausalLM
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token).eval()
+        else:
+            model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token).eval()
     else:
-        model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=torch.device(devices[0]), token=token).eval()
+        model = _load_distributed_hf(configs, devices, hf_token=token).eval()
     use_fast_tokenizer = "LlamaForCausalLM" not in model.config.architectures
     tokenizer = AutoTokenizer.from_pretrained(configs['path'], padding_side='left', use_fast=use_fast_tokenizer, token=token)
 #         tokenizer.pad_token = tokenizer.eos_token # TODO: check if this is correct?
@@ -279,9 +286,8 @@ def prepare_logits(configs, dataset, collections):
             for d in tqdm(datas):
                 content = d['user_input']
 
-                target_collection = collections
-                model, tokenizer = target_collection.model, target_collection.tokenizer
-                conv = get_conversation_template(target_collection.name)
+                model, tokenizer = collections.model, collections.tokenizer
+                conv = get_conversation_template(collections.name)
 
                 conv.append_message(conv.roles[0], content)
                 conv.append_message(conv.roles[1], None)
@@ -297,7 +303,7 @@ def prepare_logits(configs, dataset, collections):
 
             results = torch.stack(results)
             
-            logits_path = os.path.join(configs['logits_dir'], target_collection.name, f"toxic-chat/results_first_logits_{split_name}.pts")
+            logits_path = os.path.join(configs['logits_dir'], collections.name, f"toxic-chat/results_first_logits_{split_name}.pts")
             if not os.path.exists(os.path.dirname(logits_path)):
                 os.makedirs(os.path.dirname(logits_path))
             torch.save(results, logits_path)
@@ -309,30 +315,26 @@ def prepare_logits(configs, dataset, collections):
             content = d['conversation'][0]['content']
             assert d['conversation'][0]['role'] == 'user'
 
-            target_collection = collections
-            model, tokenizer = target_collection.model, target_collection.tokenizer
-            conv = get_conversation_template(target_collection.name)
+            model, tokenizer = collections.model, collections.tokenizer
+            conv = get_conversation_template(collections.name)
             conv.append_message(conv.roles[0], content)
             conv.append_message(conv.roles[1], None)
             x_init = conv.get_prompt()
             x = x_init + ' '
 
+            # TODO: use batch
             input_ids = torch.tensor(tokenizer(x, truncation=True, max_length=1024)['input_ids']).unsqueeze(0).to(model.device)
             model_inputs = model.prepare_inputs_for_generation(input_ids)
-            if 'flan-t5' in target_collection.name:
+            if 'flan-t5' in collections.name:
                 generation = model.generate(input_ids=input_ids, max_new_tokens=1, output_scores=True, return_dict_in_generate=True)
                 logits = generation.scores[0]
-            # elif 'gpt2' in target_collection.name:
-            #     logits = model(input_ids=input_ids).logits[0, -1]
-            #     generation = model.generate(input_ids=input_ids, use_cache=None, position_ids=None, attention_mask=None, max_new_tokens=1, output_scores=True, return_dict_in_generate=True)
-            #     logits = generation.scores[0]
             else:
                 logits = model(input_ids=input_ids).logits[0, -1]
 
             results.append(logits.detach().cpu())
             
         results = torch.stack(results).squeeze()
-        logits_path = os.path.join(configs['logits_dir'], target_collection.name, "lmsys-chat-1m/results_first_logits_0to20000.pts")
+        logits_path = os.path.join(configs['logits_dir'], collections.name, "lmsys-chat-1m/results_first_logits_0to20000.pts")
         if not os.path.exists(os.path.dirname(logits_path)):
             os.makedirs(os.path.dirname(logits_path))
         torch.save(results, logits_path)
