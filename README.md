@@ -11,6 +11,10 @@ All the codes are tested in the following environment:
 * easydict 1.10
 * tqdm 4.66.1
 
+Set up and activate virtual environment: `python -m venv env; source env/bin/activate`
+
+Install requirements: `pip install -r requirements.txt`
+
 #### 2. Run
 
 Configurations are in [configs.py](https://github.com/WhoTHU/detection_logits/blob/36bb1dc74ef91a714f4a9057a69b9387c1697e78/configs.py)
@@ -18,4 +22,32 @@ Configurations are in [configs.py](https://github.com/WhoTHU/detection_logits/bl
 Run the code by
 ```
 python main.py
+
+main.py [-h] --model_name {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small,flan-t5-large,flan-t5-xl,flan-t5-xxl,mistral-7b,gpt2,tiny-llama,vicuna-7b,vicuna-13b}
+        [--epochs EPOCHS] [--batch_size BATCH_SIZE] [--learning_rate LEARNING_RATE] [--l1_reg L1_REG] [--hf_token_path HF_TOKEN_PATH] [--hf_token HF_TOKEN]
+        [--device_list DEVICE_LIST] [--regression_device REGRESSION_DEVICE]
+
+Logistic Regression Training With Model Logits
+
+options:
+  -h, --help            show this help message and exit
+  --model_name {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small,flan-t5-large,flan-t5-xl,flan-t5-xxl,mistral-7b,gpt2,tiny-llama,vicuna-7b,vicuna-13b}, -m {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small,flan-t5-large,flan-t5-xl,flan-t5-xxl,mistral-7b,gpt2,tiny-llama,vicuna-7b,vicuna-13b}
+                        Name of the model
+  --epochs EPOCHS, -E EPOCHS
+                        Number of epochs
+  --batch_size BATCH_SIZE, -B BATCH_SIZE
+                        Batch size
+  --learning_rate LEARNING_RATE, -L LEARNING_RATE
+                        Learning rate
+  --l1_reg L1_REG, -R L1_REG
+                        L1 regularization
+  --hf_token_path HF_TOKEN_PATH
+                        Path to the HF token file
+  --hf_token HF_TOKEN   HF token
+  --device_list DEVICE_LIST, -D DEVICE_LIST
+                        Comma delimited list of device indices
+  --regression_device REGRESSION_DEVICE
+                        Device for regression
 ```
+
+To add a new model, create a new sub-class of `DetectionModelConfig` in `configs.py`, specifying local path and/or HuggingFace path. Add the new config to the `ALL_MODEL_CONFIGS` collection.

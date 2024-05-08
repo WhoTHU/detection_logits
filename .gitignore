@@ -1,6 +1,9 @@
 /cache/*
 /__pycache__
 
+# Cached logits
+*results_first_logits_0to20000.pts
+
 # Virtualenv
 venv/
 ENV/
