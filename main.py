@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import os
+from torch.utils.data import TensorDataset, DataLoader
 
-import re
-import copy
+import argparse
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import average_precision_score, precision_recall_curve, auc
@@ -12,30 +12,70 @@ from tqdm.auto import tqdm
 
 from utils import *
 import configs
-device = torch.device(configs.device)
+
+# device = torch.device(configs.device)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Logistic Regression Training With Model Logits')
+    parser.add_argument('--model_name', '-m', type=str,
+                        help='Name of the model', required=True,
+                        choices=list(configs.ALL_MODEL_CONFIGS.keys()))
+    parser.add_argument('--epochs', '-E', type=int,
+                        help='Number of epochs', required=False)
+    parser.add_argument('--batch_size', '-B', type=int,
+                        help='Batch size', required=False)
+    parser.add_argument('--learning_rate', '-L', type=float,
+                        help='Learning rate', required=False)
+    parser.add_argument('--l1_reg', '-R', type=float,
+                        help='L1 regularization', required=False)
+    parser.add_argument('--hf_token_path', type=str, default='./.hf_token',
+                        help='Path to the HF token file')
+    parser.add_argument('--hf_token', type=str,
+                        help='HF token', required=False)
+    parser.add_argument('--device_list', '-D', type=str, default='3',
+                        help='Comma delimited list of device indices', required=False)
+    parser.add_argument('--regression_device', type=str, default='cuda:3',
+                        help='Device for regression', required=False)
+    return parser.parse_args()
+
+args = parse_args()
+
+model_configs = configs.ALL_MODEL_CONFIGS[args.model_name]
+model_name = model_configs.name
+
+EPOCHS = args.epochs if args.epochs is not None else model_configs.epochs
+BATCH_SIZE = args.batch_size if args.batch_size is not None else model_configs.batch_size
+LEARNING_RATE = args.learning_rate if args.learning_rate is not None else model_configs.learning_rate #4e-3 for logits, 5e-4 for logp/1-p
+L1_REG = args.l1_reg if args.l1_reg is not None else model_configs.l1_reg
+
+devices = list(map(int, args.device_list.split(','))) if args.device_list is not None else list(range(torch.cuda.device_count()))
+regression_device = torch.device(args.regression_device)
+
+hf_token = args.hf_token
+if hf_token is None and os.path.exists(args.hf_token_path):
+    with open(args.hf_token_path, 'r') as f:
+        hf_token = f.read().strip()
+
 ########## Load model
-collections = prepare_model(configs.model_configs, configs.hf_token, device)
-model_name = configs.model_configs['target']['name'] # 'llama-3', 'mistral-7b', etc.
+collections = prepare_model(model_configs, hf_token, devices)
 ########## Load and prepare dataset
 data_dir = os.path.join(configs.dataset_configs['logits_dir'], model_name) # './cache' - TODO: maybe rename this?
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
-datas_tt = prepare_data(configs.dataset_configs, configs.hf_token, collections)
+datas_tt = prepare_data(configs.dataset_configs, hf_token, collections)
 ########## Regression
 split_name = 'train' # train, test
 content = datas_tt[split_name]['content']
 y_toxicity = datas_tt[split_name]['toxicity_label']
 results_tt = datas_tt[split_name]['logits']
 
-EPOCHS = 384
-BATCH_SIZE = 32
-LEARNING_RATE = 4e-4 #4e-3 for logits, 5e-4 for logp/1-p
-L1_REG = 4e-4
 TRAIN_NUM = datas_tt.train.toxicity_label.shape[0]
 TEST_NUM = datas_tt.test.toxicity_label.shape[0]
 params_repr = f"E{EPOCHS}_B{BATCH_SIZE}_LR{'{:.1e}'.format(LEARNING_RATE)}_L1R{'{:.1e}'.format(L1_REG)}_TRN{TRAIN_NUM}_TEST{TEST_NUM}"
 if not os.path.exists(os.path.join(data_dir, params_repr)):
     os.makedirs(os.path.join(data_dir, params_repr))
+
+np.savez(os.path.join(data_dir, params_repr, 'train_test_ids.npz'), train_ids=datas_tt['train']['sentence_ids'], test_ids=datas_tt['test']['sentence_ids'])
 
 def get_feature(results_tt):
     if len(results_tt.shape) == 1:
@@ -51,8 +91,6 @@ def get_feature(results_tt):
 #     results_tt = x
     return results_tt
 results_tt = get_feature(results_tt)
-
-from torch.utils.data import TensorDataset, DataLoader
 
 class LogisticRegression(torch.nn.Module):    
     def __init__(self, n_inputs, n_outputs, normalization=[None, None], min_std=1e-10):
@@ -74,9 +112,9 @@ train_loader = DataLoader(train_data, batch_size=BATCH_SIZE)
 mean_fixed = results_tt.mean(0)
 std_fixed = results_tt.std(0)
 
-n_inputs = collections.target.model.lm_head.out_features
+n_inputs = collections.model.lm_head.out_features
 n_outputs = 1
-log_regr = LogisticRegression(n_inputs, n_outputs, normalization=(mean_fixed, std_fixed)).to(device)
+log_regr = LogisticRegression(n_inputs, n_outputs, normalization=(mean_fixed, std_fixed)).to(regression_device)
 ### unbalanced sample weights
 pos_weight = y_toxicity.logical_not().sum() / y_toxicity.sum()
 
@@ -86,7 +124,7 @@ optimizer = torch.optim.SGD(log_regr.parameters(), lr=LEARNING_RATE)
 losses = []
 for epoch in tqdm(range(EPOCHS)):
     for i, (x, y) in enumerate(train_loader):
-        x, y  = x.to(device), y.to(device)
+        x, y  = x.to(regression_device), y.to(regression_device)
         optimizer.zero_grad()
         outputs = log_regr(x)[..., 0]
         loss = F.binary_cross_entropy_with_logits(outputs, y, pos_weight=pos_weight)
@@ -141,7 +179,7 @@ results = []
 for i in range(num_batches):
     start_idx = i * BATCH_SIZE
     end_idx = min((i + 1) * BATCH_SIZE, results_tt.shape[0])
-    batch_results = results_tt[start_idx:end_idx].to(device)
+    batch_results = results_tt[start_idx:end_idx].to(regression_device)
     batch_outputs = log_regr(batch_results)[..., 0].detach().cpu()
     results.append(batch_outputs)
 
