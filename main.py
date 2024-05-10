@@ -17,8 +17,8 @@ import configs
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Logistic Regression Training With Model Logits')
-    parser.add_argument('--model_name', '-m', type=str,
-                        help='Name of the model', required=True,
+    parser.add_argument('model_name', type=str,
+                        help='Name of the model',
                         choices=list(configs.ALL_MODEL_CONFIGS.keys()))
     parser.add_argument('--epochs', '-E', type=int,
                         help='Number of epochs', required=False)
