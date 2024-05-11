@@ -29,10 +29,12 @@ main.py [-h] --model_name {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small
 
 Logistic Regression Training With Model Logits
 
+positional arguments:
+  {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small,flan-t5-large,flan-t5-xl,flan-t5-xxl,mistral-7b,gpt2,tiny-llama,vicuna-7b,vicuna-13b}
+                        Name of the model
+
 options:
   -h, --help            show this help message and exit
-  --model_name {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small,flan-t5-large,flan-t5-xl,flan-t5-xxl,mistral-7b,gpt2,tiny-llama,vicuna-7b,vicuna-13b}, -m {llama-2,llama-2-13b,llama-2-70b,llama-3,flan-t5-small,flan-t5-large,flan-t5-xl,flan-t5-xxl,mistral-7b,gpt2,tiny-llama,vicuna-7b,vicuna-13b}
-                        Name of the model
   --epochs EPOCHS, -E EPOCHS
                         Number of epochs
   --batch_size BATCH_SIZE, -B BATCH_SIZE
