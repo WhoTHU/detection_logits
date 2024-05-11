@@ -325,7 +325,8 @@ def prepare_logits(configs, dataset, collections):
                 x_init = conv.get_prompt()
                 x = x_init + ' '
 
-                input_ids = torch.tensor(tokenizer(x)['input_ids']).unsqueeze(0).to(model.device)
+                tokenized = tokenizer(x, truncation=True, max_length=1024) if collections.name == 'gpt2' else tokenizer(x)
+                input_ids = torch.tensor(tokenized['input_ids']).unsqueeze(0).to(model.device)
                 # input_ids_m = input_ids
                 # logits = model(input_ids=input_ids_m).logits
 
@@ -358,7 +359,8 @@ def prepare_logits(configs, dataset, collections):
             x = x_init + ' '
 
             # TODO: use batch
-            input_ids = torch.tensor(tokenizer(x, truncation=True, max_length=1024)['input_ids']).unsqueeze(0).to(model.device)
+            tokenized = tokenizer(x, truncation=True, max_length=1024) if collections.name == 'gpt2' else tokenizer(x)
+            input_ids = torch.tensor(tokenized['input_ids']).unsqueeze(0).to(model.device)
             model_inputs = model.prepare_inputs_for_generation(input_ids)
             if 'flan-t5' in collections.name:
                 generation = model.generate(input_ids=input_ids, max_new_tokens=1, output_scores=True, return_dict_in_generate=True)

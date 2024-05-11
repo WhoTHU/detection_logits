@@ -50,6 +50,8 @@ options:
                         Comma delimited list of device indices
   --regression_device REGRESSION_DEVICE
                         Device for regression
+  --data_set {toxic-chat,lmsys-chat-1m,lmsys-chat-1m-handlabeled-split}, -S {toxic-chat,lmsys-chat-1m,lmsys-chat-1m-handlabeled-split}
+                        Name of dataset
 ```
 
 To add a new model, create a new sub-class of `DetectionModelConfig` in `configs.py`, specifying local path and/or HuggingFace path. Add the new config to the `ALL_MODEL_CONFIGS` collection.

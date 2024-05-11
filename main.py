@@ -36,12 +36,17 @@ def parse_args():
                         help='Comma delimited list of device indices', required=False)
     parser.add_argument('--regression_device', type=str, default='cuda:3',
                         help='Device for regression', required=False)
+    parser.add_argument('--data_set', '-S', type=str, default='toxic-chat',
+                        help='Name of dataset',
+                        choices=list(configs.ALL_DATASET_CONFIGS.keys()))
     return parser.parse_args()
 
 args = parse_args()
 
 model_configs = configs.ALL_MODEL_CONFIGS[args.model_name]
 model_name = model_configs.name
+
+dataset_configs = configs.ALL_DATASET_CONFIGS[args.data_set]
 
 EPOCHS = args.epochs if args.epochs is not None else model_configs.epochs
 BATCH_SIZE = args.batch_size if args.batch_size is not None else model_configs.batch_size
@@ -59,10 +64,10 @@ if hf_token is None and os.path.exists(args.hf_token_path):
 ########## Load model
 collections = prepare_model(model_configs, hf_token, devices)
 ########## Load and prepare dataset
-data_dir = os.path.join(configs.dataset_configs['logits_dir'], configs.dataset_configs['name'], model_name) # './cache' - TODO: maybe rename this?
+data_dir = os.path.join(dataset_configs['logits_dir'], dataset_configs['name'], model_name) # './cache' - TODO: maybe rename this?
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
-datas_tt = prepare_data(configs.dataset_configs, hf_token, collections)
+datas_tt = prepare_data(dataset_configs, hf_token, collections)
 ########## Regression
 split_name = 'train' # train, test
 content = datas_tt[split_name]['content']
@@ -75,7 +80,7 @@ params_repr = f"E{EPOCHS}_B{BATCH_SIZE}_LR{'{:.1e}'.format(LEARNING_RATE)}_L1R{'
 if not os.path.exists(os.path.join(data_dir, params_repr)):
     os.makedirs(os.path.join(data_dir, params_repr))
 
-if configs.dataset_configs['name'] == 'lmsys-chat-1m':
+if dataset_configs['name'] == 'lmsys-chat-1m':
     np.savez(os.path.join(data_dir, params_repr, 'train_test_ids.npz'), train_ids=datas_tt['train']['sentence_ids'], test_ids=datas_tt['test']['sentence_ids'])
 
 def get_feature(results_tt):
