@@ -101,7 +101,7 @@ def prepare_model(configs, token, devices):
     
     if devices is None or len(devices) == 1:
         device_map = torch.device(devices[0]) if devices is not None else torch.device("cpu")
-        if 'Mistral-7B-Instruct-v0.2' in model_path.lower():
+        if 'mistral-7b-instruct-v0.2' in model_path.lower():
             # Manual setting of sliding window
             # See https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2/discussions/56
             model_config = AutoConfig.from_pretrained(model_path)
