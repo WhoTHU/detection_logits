@@ -51,3 +51,5 @@ options:
 ```
 
 To add a new model, create a new sub-class of `DetectionModelConfig` in `configs.py`, specifying local path and/or HuggingFace path. Add the new config to the `ALL_MODEL_CONFIGS` collection.
+
+To choose a data set, see `dataset_configs` in `configs.py`.

@@ -59,7 +59,7 @@ if hf_token is None and os.path.exists(args.hf_token_path):
 ########## Load model
 collections = prepare_model(model_configs, hf_token, devices)
 ########## Load and prepare dataset
-data_dir = os.path.join(configs.dataset_configs['logits_dir'], model_name) # './cache' - TODO: maybe rename this?
+data_dir = os.path.join(configs.dataset_configs['logits_dir'], configs.dataset_configs['name'], model_name) # './cache' - TODO: maybe rename this?
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 datas_tt = prepare_data(configs.dataset_configs, hf_token, collections)
@@ -75,7 +75,8 @@ params_repr = f"E{EPOCHS}_B{BATCH_SIZE}_LR{'{:.1e}'.format(LEARNING_RATE)}_L1R{'
 if not os.path.exists(os.path.join(data_dir, params_repr)):
     os.makedirs(os.path.join(data_dir, params_repr))
 
-np.savez(os.path.join(data_dir, params_repr, 'train_test_ids.npz'), train_ids=datas_tt['train']['sentence_ids'], test_ids=datas_tt['test']['sentence_ids'])
+if configs.dataset_configs['name'] == 'lmsys-chat-1m':
+    np.savez(os.path.join(data_dir, params_repr, 'train_test_ids.npz'), train_ids=datas_tt['train']['sentence_ids'], test_ids=datas_tt['test']['sentence_ids'])
 
 def get_feature(results_tt):
     if len(results_tt.shape) == 1:
@@ -84,6 +85,7 @@ def get_feature(results_tt):
 #     results_tt = results_tt.log()
     # Bound away from 0 and 1 to avoid numerical instability
     results_tt = torch.clamp(results_tt, min=1e-16).log() - torch.clamp(1 - results_tt, min=1e-16).log()
+    # results_tt = results_tt.log() - (1 - results_tt).log()
 #     x = torch.zeros_like(results_tt)
 #     idx = results_tt.topk(1000, 1)[1]
 #     t = results_tt.gather(1, idx)

@@ -7,6 +7,7 @@ from accelerate import (
 )
 import numpy as np
 import math
+import json
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score as roc_auc
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, AutoModelForSeq2SeqLM
@@ -131,7 +132,7 @@ def prepare_data(configs, token, collections):
     
     if configs['name'] == 'toxic-chat':
         if configs['path'] is not None:
-            dataset = load_dataset(configs['path'])
+            dataset = load_dataset(configs['path'], "toxicchat0124")
         else:
             dataset = load_dataset("lmsys/toxic-chat", "toxicchat0124", token=token)
 
@@ -226,6 +227,33 @@ def prepare_data(configs, token, collections):
             })
         return datas_tt
 
+    elif configs['name'] == 'lmsys-chat-1m-handlabeled-split':
+        with open(configs['path']) as f:
+            dataset = json.load(f)
+        datas_tt = EasyDict({})
+        for split_name in ['train', 'test']:
+            print(split_name)
+
+            y_toxicity = torch.tensor([t[2] for t in dataset[split_name]]).bool()
+            
+            print(f"Total number:\t\t{len(dataset[split_name])}")
+            print(f"Toxic number:\t\t{y_toxicity.sum().item()}")
+            
+            content = [t[1] for t in dataset[split_name]]
+
+            logits_path = os.path.join(configs['logits_dir'], collections.name, f"lmsys-chat-1m-handlabeled-split/results_first_logits_{split_name}.pts")
+            if not os.path.exists(logits_path):
+                prepare_logits(configs, dataset, collections)
+            results_tt = torch.load(logits_path)
+            
+            datas_tt[split_name] = EasyDict({
+                'content': content,
+                'toxicity_label': y_toxicity,
+                'logits': results_tt,
+            })
+            print([key for key in datas_tt])
+        return datas_tt
+
     else:
         raise NotImplementedError
     
@@ -278,13 +306,16 @@ def computeMetrics(scores, FPR, ths=(1e-3, 1e-4, 1e-5)):
 
 
 def prepare_logits(configs, dataset, collections):
-    if configs['name'] == 'toxic-chat':
+    if configs['name'] in ['toxic-chat', 'lmsys-chat-1m-handlabeled-split']:
         for split_name in ['train', 'test']: # train, test
             print(split_name)
             datas = dataset[split_name]
             results = []
             for d in tqdm(datas):
-                content = d['user_input']
+                if configs['name'] == 'toxic-chat':
+                    content = d['user_input']
+                elif configs['name'] == 'lmsys-chat-1m-handlabeled-split':
+                    content = d[1]
 
                 model, tokenizer = collections.model, collections.tokenizer
                 conv = get_conversation_template(collections.name)
@@ -295,15 +326,19 @@ def prepare_logits(configs, dataset, collections):
                 x = x_init + ' '
 
                 input_ids = torch.tensor(tokenizer(x)['input_ids']).unsqueeze(0).to(model.device)
-                input_ids_m = input_ids
-                logits = model(input_ids=input_ids_m).logits
+                # input_ids_m = input_ids
+                # logits = model(input_ids=input_ids_m).logits
 
-                l = logits[0, -1]
-                results.append(l.detach().cpu())
+                if 'flan-t5' in collections.name:
+                    generation = model.generate(input_ids=input_ids, max_new_tokens=1, output_scores=True, return_dict_in_generate=True)
+                    logits = generation.scores[0]
+                else:
+                    logits = model(input_ids=input_ids).logits[0, -1]
+                results.append(logits.detach().cpu())
 
-            results = torch.stack(results)
+            results = torch.stack(results).squeeze()
             
-            logits_path = os.path.join(configs['logits_dir'], collections.name, f"toxic-chat/results_first_logits_{split_name}.pts")
+            logits_path = os.path.join(configs['logits_dir'], collections.name, configs['name'], f"results_first_logits_{split_name}.pts")
             if not os.path.exists(os.path.dirname(logits_path)):
                 os.makedirs(os.path.dirname(logits_path))
             torch.save(results, logits_path)

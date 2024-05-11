@@ -130,14 +130,21 @@ ALL_MODEL_CONFIGS = {
 dataset_configs = {
     # ########## toxic-chat
     # 'name': 'toxic-chat', # toxic-chat, lmsys-chat-1m
-    # 'path': None, # local path
+    # 'path': '/data1/public_datasets/toxic-chat', # local path
     # 'logits_dir': './cache',
 
     ########## lmsys-chat-1m
-    'name': 'lmsys-chat-1m', # toxic-chat, lmsys-chat-1m
-    'path': None, # local path
-    'select': 20000, # use the first several examples
+    # 'name': 'lmsys-chat-1m', # toxic-chat, lmsys-chat-1m
+    # 'path': None, # local path
+    # 'select': 20000, # use the first several examples
+    # 'logits_dir': './cache',
+
+    ########## lmsys-chat-1m-handlabeled-split
+    'name': 'lmsys-chat-1m-handlabeled-split', # toxic-chat, lmsys-chat-1m
+    'path': '/home/geng/handlabeled_toxicity_lmsys_1m_split.json', # local path
+    # 'select': 20000, # use the first several examples
     'logits_dir': './cache',
+
 }
 
 
