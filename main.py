@@ -211,10 +211,12 @@ file_name = f"./paper_results/cache/metrics/{model_name}/{dataset_configs['name'
 if not os.path.exists(os.path.dirname(file_name)):
     os.makedirs(os.path.dirname(file_name))
 np.save(file_name, metrics)
+print(f"AP is {average_precision:.2%}, AUPRC is {auprc:.2%}")
 
 # Print parameters
+print(f"Model: {model_name}, Dataset: {dataset_configs['name']}")
 print(f"Epochs: {EPOCHS}, Batch size: {BATCH_SIZE}, Learning rate: {LEARNING_RATE}, L1 regularization: {L1_REG}")
-print(f"Train size: {TRAIN_NUM}, Test size: {TEST_NUM}")
+print(f"Train size: {TRAIN_NUM}, Test size: {TEST_NUM}\n")
 
 # ########## Plot test
 # plt.figure(figsize=(12, 7.5))
