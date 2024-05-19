@@ -199,16 +199,16 @@ scores_split = [r2, r1]
 FPR = np.linspace(0, 1, 1001)
 ths = (1e-1, 1e-2, 1e-3, 1e-4)
 metrics = computeMetrics(scores_split, FPR, ths)
-np.save(os.path.join(data_dir, params_repr, 'metrics'), metrics)
-np.savez(os.path.join(data_dir, params_repr, 'scores_split'), r1=r1, r2=r2)
-
 y_score = np.concatenate(scores_split)
 y_test = np.concatenate([np.ones_like(scores_split[0]), np.zeros_like(scores_split[1])])
 average_precision = average_precision_score(y_test, y_score)
 precision, recall, thresholds = precision_recall_curve(y_test, y_score)
 auprc = auc(recall, precision)
-
-print(f"AUPRC is {auprc}")
+metrics['AUPRC'] = auc(recall, precision)
+metrics['AP'] = average_precision
+metrics['scores_split'] = scores_split
+file_name = f"{model_name}/{dataset_configs['name']}/{params_repr}/metrics_slr" # 'metrics_SLR_toxicchat', 'metrics_lmguard_toxicchat', 'metrics_oaimod_toxicchat'
+np.save(f"./paper_results/cache/metrics/{file_name}", metrics)
 
 # Print parameters
 print(f"Epochs: {EPOCHS}, Batch size: {BATCH_SIZE}, Learning rate: {LEARNING_RATE}, L1 regularization: {L1_REG}")

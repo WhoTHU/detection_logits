@@ -110,6 +110,8 @@ def prepare_model(configs, token, devices):
         elif 'flan-t5' in model_path.lower():
             # Not supported with AutoModelForCausalLM
             model = AutoModelForSeq2SeqLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token).eval()
+        elif 'gptq' in model_path.lower():
+            model = AutoModelForCausalLM.from_pretrained(model_path, device_map=device_map, token=token, trust_remote_code=True, revision="main").eval()
         else:
             model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token).eval()
     else:

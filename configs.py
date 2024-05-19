@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 
 class DetectionModelConfig(ABC):
     def __init__(self, name, hf_path: str = None, local_path: str = None,
-                 epochs: int = 512, batch_size: int = 32, learning_rate: float = 5e-4,
-                 l1_reg: float = 5e-4, max_length: int|None = None): # devices
+                 epochs: int = 500, batch_size: int = 32, learning_rate: float = 5e-4,
+                 l1_reg: float = 1e-3, max_length: int|None = None): # devices
         self.name = name
         self.hf_path = hf_path
         self.local_path = local_path
@@ -39,7 +39,19 @@ class Llama2_70BDetectionConfig(DetectionModelConfig):
     def __init__(self, **kwargs):
         super().__init__('llama-2-70b',
                          'meta-llama/Llama-2-70b-chat-hf',
-                         **kwargs)        
+                         **kwargs)
+
+class Llama2_7BGPTQDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('llama-2-7b-gptq',
+                         'TheBloke/Llama-2-7B-GPTQ',
+                         **kwargs)
+
+class Llama2_13BGPTQDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('llama-2-13b-gptq',
+                         'TheBloke/Llama-2-13B-GPTQ',
+                         **kwargs)
 
 class Llama3_8BDetectionConfig(DetectionModelConfig):
     def __init__(self, **kwargs):
@@ -116,6 +128,8 @@ ALL_MODEL_CONFIGS = {
     'llama-2-13b': Llama2_13BDetectionConfig(),
     'llama-2-70b': Llama2_70BDetectionConfig(),
     'llama-3': Llama3_8BDetectionConfig(),
+    'llama-2-7b-gptq': Llama2_7BGPTQDetectionConfig(),
+    'llama-2-13b-gptq': Llama2_13BGPTQDetectionConfig(),
     'flan-t5-small': FlanT5SmallDetectionConfig(),
     'flan-t5-large': FlanT5LargeDetectionConfig(),
     'flan-t5-xl': FlanT5XLDetectionConfig(),
