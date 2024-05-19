@@ -207,8 +207,10 @@ auprc = auc(recall, precision)
 metrics['AUPRC'] = auc(recall, precision)
 metrics['AP'] = average_precision
 metrics['scores_split'] = scores_split
-file_name = f"{model_name}/{dataset_configs['name']}/{params_repr}/metrics_slr" # 'metrics_SLR_toxicchat', 'metrics_lmguard_toxicchat', 'metrics_oaimod_toxicchat'
-np.save(f"./paper_results/cache/metrics/{file_name}", metrics)
+file_name = f"./paper_results/cache/metrics/{model_name}/{dataset_configs['name']}/{params_repr}/metrics_slr" # 'metrics_SLR_toxicchat', 'metrics_lmguard_toxicchat', 'metrics_oaimod_toxicchat'
+if not os.path.exists(os.path.dirname(file_name)):
+    os.makedirs(os.path.dirname(file_name))
+np.save(file_name, metrics)
 
 # Print parameters
 print(f"Epochs: {EPOCHS}, Batch size: {BATCH_SIZE}, Learning rate: {LEARNING_RATE}, L1 regularization: {L1_REG}")
