@@ -112,12 +112,17 @@ def prepare_model(configs, token, devices):
             model = AutoModelForSeq2SeqLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token).eval()
         elif 'gptq' in model_path.lower():
             model = AutoModelForCausalLM.from_pretrained(model_path, device_map=device_map, token=token, trust_remote_code=True, revision="main").eval()
+        elif: 'qwen' in model_path.lower():
+            model = AutoModelForCausalLM.from_pretrained(model_path, device_map=device_map, token=token, trust_remote_code=True).eval()
         else:
             model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=device_map, token=token).eval()
     else:
         model = _load_distributed_hf(configs, devices, hf_token=token).eval()
-    use_fast_tokenizer = "LlamaForCausalLM" not in model.config.architectures
-    tokenizer = AutoTokenizer.from_pretrained(configs['path'], padding_side='left', use_fast=use_fast_tokenizer, token=token)
+    if 'qwen' in model_path.lower():
+        tokenizer = AutoTokenizer.from_pretrained(configs['path'], token=token, trust_remote_code=True)
+    else:
+        use_fast_tokenizer = "LlamaForCausalLM" not in model.config.architectures
+        tokenizer = AutoTokenizer.from_pretrained(configs['path'], padding_side='left', use_fast=use_fast_tokenizer, token=token)
 #         tokenizer.pad_token = tokenizer.eos_token # TODO: check if this is correct?
     for p in model.parameters():
         p.requires_grad_(False)
@@ -133,7 +138,7 @@ def prepare_model(configs, token, devices):
 def prepare_data(configs, token, collections):
     
     if configs['name'] == 'toxic-chat':
-        if configs['path'] is not None:
+        if configs['path'] is not None and os.path.exists(configs['path']):
             dataset = load_dataset(configs['path'], "toxicchat0124")
         else:
             dataset = load_dataset("lmsys/toxic-chat", "toxicchat0124", token=token)

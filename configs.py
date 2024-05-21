@@ -78,14 +78,14 @@ class FlanT5XLDetectionConfig(DetectionModelConfig):
                          'google/flan-t5-xl',
                          '/data1/public_models/flan-t5/flan-t5-xl',
                          **kwargs)
-        
+
 class FlanT5XXLDetectionConfig(DetectionModelConfig):
     def __init__(self, **kwargs):
         super().__init__('flan-t5-xxl',
                          'google/flan-t5-xxl',
                          '/data1/public_models/flan-t5/flan-t5-xxl',
                          **kwargs)
-        
+
 class Mistral7BDetectionConfig(DetectionModelConfig):
     def __init__(self, **kwargs):
         super().__init__('mistral-7b',
@@ -99,14 +99,14 @@ class GPT2DetectionConfig(DetectionModelConfig):
                          'openai-community/gpt2-large',
                          max_length=1024,
                          **kwargs)
-        
+
 class TinyLlamaDetectionConfig(DetectionModelConfig):
     def __init__(self, **kwargs):
         super().__init__('tiny-llama',
                          'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
                          '/data1/public_models/llama/TinyLlama-1.1B-Chat-v1.0',
                          **kwargs)
-        
+
 class Vicuna7BDetectionConfig(DetectionModelConfig):
     def __init__(self, **kwargs):
         super().__init__('vicuna-7b',
@@ -119,6 +119,36 @@ class Vicuna13BDetectionConfig(DetectionModelConfig):
         super().__init__('vicuna-13b',
                          'lmsys/vicuna-13b-v1.5-16k',
                          '/data1/public_models/llama/vicuna-13b-v1.5-16k',
+                         **kwargs)
+
+class Qwen7BDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('qwen-7b',
+                         'Qwen/Qwen-7B-Chat',
+                         **kwargs)
+
+class Qwen13BDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('qwen-13b',
+                         'Qwen/Qwen-13B-Chat',
+                         **kwargs)
+
+class Koala7BDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('koala-7b',
+                         'TheBloke/koala-7B-HF',
+                         **kwargs)
+
+class Baichuan2_7BDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('baichuan-2-7b',
+                         'baichuan-inc/Baichuan2-7B-Chat',
+                         **kwargs)
+
+class Baichuan2_13BDetectionConfig(DetectionModelConfig):
+    def __init__(self, **kwargs):
+        super().__init__('baichuan-2-13b',
+                         'baichuan-inc/Baichuan2-13B-Chat',
                          **kwargs)
 
 # Add more subclasses for other detection models
@@ -139,6 +169,9 @@ ALL_MODEL_CONFIGS = {
     'tiny-llama': TinyLlamaDetectionConfig(),
     'vicuna-7b': Vicuna7BDetectionConfig(),
     'vicuna-13b': Vicuna13BDetectionConfig(),
+    'qwen-7b': Qwen7BDetectionConfig(),
+    'koala-7b': Koala7BDetectionConfig(),
+    'baichuan-2-7b': Baichuan2_7BDetectionConfig(),
 }
 
 dataset_configs = {
