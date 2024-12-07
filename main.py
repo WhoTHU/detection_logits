@@ -25,13 +25,7 @@ results_tt = datas_tt[split_name]['logits']
 
 def get_feature(results_tt):
     results_tt = results_tt.softmax(1)
-#     results_tt = results_tt.log()
     results_tt = results_tt.log() - (1 - results_tt).log()
-#     x = torch.zeros_like(results_tt)
-#     idx = results_tt.topk(1000, 1)[1]
-#     t = results_tt.gather(1, idx)
-#     x.scatter_(1, idx, t)
-#     results_tt = x
     return results_tt
 results_tt = get_feature(results_tt)
 
@@ -61,7 +55,6 @@ log_regr = LogisticRegression(n_inputs, n_outputs, normalization=(mean_fixed, st
 pos_weight = y_toxicity.logical_not().sum() / y_toxicity.sum()
 
 optimizer = torch.optim.SGD(log_regr.parameters(), lr=5e-4) #4e-3 for logits, 5e-4 for logp/1-p
-# optimizer = torch.optim.Adam(log_regr.parameters(), lr=0.001)
 
 epochs = 200
 losses = []
@@ -115,8 +108,7 @@ results_tt = datas_tt[split_name]['logits']
 
 results_tt = get_feature(results_tt)
 results = log_regr(results_tt.to(device))[..., 0].detach().cpu()
-# results = results_tt[:, 306] # logits
-# results = results_tt[:, 8221] # logits
+# results = results_tt[:, 306] # logits of I
 
 r1 = results[y_toxicity.logical_not()].numpy()
 r2 = results[y_toxicity].numpy()
@@ -135,6 +127,8 @@ precision, recall, thresholds = precision_recall_curve(y_test, y_score)
 auprc = auc(recall, precision)
 
 print(f"AUPRC is {auprc}")
+print(f"Success rate is {metrics['acc_opt']:.4f} with threshold {metrics['thr_opt']:.4f}")
+print(f"TPRs at low FPR are " + ', '.join([f"{x:.2f}" for x in metrics['TPRs_lowFPR'] * 100]))
 
 # ########## Plot test
 # plt.figure(figsize=(12, 7.5))

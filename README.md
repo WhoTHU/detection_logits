@@ -1,5 +1,11 @@
 # detection_logits
 
+This is the official repository for the paper [Toxicity Detection for Free](https://arxiv.org/abs/2405.18822) accepted as a spotlight in Neurips 2024.
+
+<p align="center">
+  <img src="readme_figs/fig1.jpg" alt="drawing" width="80%"/>
+</p>
+
 #### 1. Installation
 All the codes are tested in the following environment:
 * python 3.11.0
@@ -19,3 +25,4 @@ Run the code by
 ```
 python main.py
 ```
+Uncomment the code for plotting figures if you require visual feedback.
