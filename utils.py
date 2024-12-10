@@ -8,6 +8,7 @@ from datasets import load_dataset
 from easydict import EasyDict
 from tqdm.auto import tqdm
 from fastchat.model import get_conversation_template
+import json
 
 
 def prepare_model(configs, token, device):
@@ -67,66 +68,33 @@ def prepare_data(configs, token, collections):
                 'jailbreaking_label': y_jailbreaking,
                 'logits': results_tt,
             })
-            print([key for key in datas_tt])
+            print(f"Total number:\t\t{len(dataset[split_name])}")
+            print(f"Toxic number:\t\t{datas_tt[split_name]['toxicity_label'].sum().item()}")
         return datas_tt
 
     elif configs['name'] == 'lmsys-chat-1m':
         if configs['path'] is not None:
-            dataset = load_dataset(configs['path'])
+            dataset = json.load(open(configs['path'], 'r'))
         else:
-            dataset = load_dataset("lmsys/lmsys-chat-1m", token=token)
-
-        logits_path = os.path.join(configs['logits_dir'], "lmsys-chat-1m/results_first_logits_0to20000.pts")
-        if not os.path.exists(logits_path):
-            prepare_logits(configs, dataset, collections)
-        results_tt = torch.load(logits_path)
-
-        select = configs['select']
-        dataset_sub = dataset['train'][:select]
-        train_num = int(0.5 * select)
-        train_ids = np.concatenate([np.ones(train_num), np.zeros(select - train_num)])
-        np.random.shuffle(train_ids)
-        test_ids = np.logical_not(train_ids)
-
-        # selected = np.array(dataset_sub['turn']) == 1
-        selected_ids = np.array(dataset_sub['turn']) > 0
-        train_ids = np.logical_and(train_ids, selected_ids)
-        test_ids = np.logical_and(test_ids, selected_ids)
-        split_ids = {
-            'train': train_ids,
-            'test': test_ids,
-        }
-        label_names = [k for k in dataset_sub['openai_moderation'][0][0]['categories']]
-        print('\n'.join([f"{i}: {name}" for i, name in enumerate(label_names)]))
-        full_scores = np.array([[x[0]['category_scores'][k] for k in label_names] for x in dataset_sub['openai_moderation']])
-        full_labels = np.array([[x[0]['categories'][k] for k in label_names] for x in dataset_sub['openai_moderation']]) # logical_or of all labels
-        # full_labels = full_scores >= 0.1
-
+            print('Please download manually labeled data')
+            raise ValueError
+        
         datas_tt = EasyDict({})
         for split_name in ['train', 'test']: # train, test
             print(split_name)
+            logits_path = os.path.join(configs['logits_dir'], f"lmsys-chat-1m/results_first_logits_{split_name}.pts")
+            if not os.path.exists(logits_path):
+                prepare_logits(configs, dataset, collections)
+            results_tt = torch.load(logits_path)
 
-            # labels
-            y_full = torch.from_numpy(full_labels[split_ids[split_name]])
-            y_score = torch.from_numpy(full_scores[split_ids[split_name]])
-            y_toxicity = y_full.sum(1) > 0
-        #     y_jailbreaking = torch.tensor([d['jailbreaking'] for d in datas]).bool()
-        #     assert y_jailbreaking.logical_and(y_toxicity.logical_not()).sum() == 0
-            
-            print(f"Total number:\t\t{len(y_toxicity)}")
-            print(f"Toxic number:\t\t{y_toxicity.sum().item()}")
-        #     print(f"jailbreaking number:\t{y_jailbreaking.sum().item()}")
-            
-            content = np.array([x[0]['content'] for x in dataset_sub['conversation']])[split_ids[split_name]].tolist()
-            
             datas_tt[split_name] = EasyDict({
-                'content': content,
-                'toxicity_label': y_toxicity,
-                'full_label': y_full,
-                'full_score': y_score,
-        #         'jailbreaking_label': y_jailbreaking,
-                'logits': results_tt[:select][torch.from_numpy(split_ids[split_name])],
+                'content': [d[1] for d in dataset[split_name]],
+                'toxicity_label': torch.tensor([d[2] for d in dataset[split_name]]).bool(),
+                'jailbreaking_label': torch.tensor([d[4] for d in dataset[split_name]]).bool(),
+                'logits': results_tt,
             })
+            print(f"Total number:\t\t{len(dataset[split_name])}")
+            print(f"Toxic number:\t\t{datas_tt[split_name]['toxicity_label'].sum().item()}")
         return datas_tt
 
     else:
@@ -181,13 +149,13 @@ def computeMetrics(scores, FPR, ths=(1e-3, 1e-4, 1e-5)):
 
 
 def prepare_logits(configs, dataset, collections):
-    if configs['name'] == 'toxic-chat':
+    if configs['name'] in ['toxic-chat', 'lmsys-chat-1m']:
         for split_name in ['train', 'test']: # train, test
             print(split_name)
             datas = dataset[split_name]
             results = []
             for d in tqdm(datas):
-                content = d['user_input']
+                content = d['user_input'] if configs['name'] == 'toxic-chat' else d[1]
 
                 target_collection = collections.target
                 model, tokenizer = target_collection.model, target_collection.tokenizer
@@ -207,38 +175,9 @@ def prepare_logits(configs, dataset, collections):
 
             results = torch.stack(results)
             
-            logits_path = os.path.join(configs['logits_dir'], f"toxic-chat/results_first_logits_{split_name}.pts")
+            logits_path = os.path.join(configs['logits_dir'], f"{configs['name']}/results_first_logits_{split_name}.pts")
             if not os.path.exists(os.path.dirname(logits_path)):
                 os.makedirs(os.path.dirname(logits_path))
             torch.save(results, logits_path)
-
-
-    elif configs['name'] == 'lmsys-chat-1m':
-        results = []
-        for i, d in tqdm(zip(range(20000), dataset['train'])):
-            content = d['conversation'][0]['content']
-            assert d['conversation'][0]['role'] == 'user'
-
-            target_collection = collections.target
-            model, tokenizer = target_collection.model, target_collection.tokenizer
-            conv = get_conversation_template(target_collection.name)
-            conv.append_message(conv.roles[0], content)
-            conv.append_message(conv.roles[1], None)
-            x_init = conv.get_prompt()
-            x = x_init + ' '
-
-            input_ids = torch.tensor(tokenizer(x)['input_ids']).unsqueeze(0).to(model.device)
-            input_ids_m = input_ids
-            logits = model(input_ids=input_ids_m).logits
-
-            l = logits[0, -1]
-            results.append(l.detach().cpu())
-            
-        results = torch.stack(results)
-        logits_path = os.path.join(configs['logits_dir'], "lmsys-chat-1m/results_first_logits_0to20000.pts")
-        if not os.path.exists(os.path.dirname(logits_path)):
-            os.makedirs(os.path.dirname(logits_path))
-        torch.save(results, logits_path)
-
     else:
         raise NotImplementederror

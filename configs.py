@@ -17,13 +17,12 @@ model_configs = {
 dataset_configs = {
     # ########## toxic-chat
     # 'name': 'toxic-chat', # toxic-chat, lmsys-chat-1m
-    # 'path': None, # local path
+    # 'path': None, # or local path
     # 'logits_dir': './cache',
 
     ########## lmsys-chat-1m
     'name': 'lmsys-chat-1m', # toxic-chat, lmsys-chat-1m
-    'path': None, # local path
-    'select': 10000, # use the first several examples
+    'path': "./data/handlabeled_toxicity_lmsys_1m_split_50.json", # local path
     'logits_dir': './cache',
 }
 

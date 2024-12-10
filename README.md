@@ -25,4 +25,8 @@ Run the code by
 ```
 python main.py
 ```
-Uncomment the code for plotting figures if you require visual feedback.
+Uncomment the code for plotting figures if you require visual feedback. It will show plots like (for ToxicChat):
+
+<p align="center">
+  <img src="readme_figs/test_plot.jpg" alt="drawing" width="100%"/>
+</p>

@@ -56,10 +56,10 @@ pos_weight = y_toxicity.logical_not().sum() / y_toxicity.sum()
 
 optimizer = torch.optim.SGD(log_regr.parameters(), lr=5e-4) #4e-3 for logits, 5e-4 for logp/1-p
 
-epochs = 200
+epochs = 500
 losses = []
-for epoch in range(epochs):
-    for i, (x, y) in tqdm(enumerate(train_loader)):
+for epoch in tqdm(range(epochs)):
+    for i, (x, y) in enumerate(train_loader):
         x, y  = x.to(device), y.to(device)
         optimizer.zero_grad()
         outputs = log_regr(x)[..., 0]
@@ -71,35 +71,14 @@ for epoch in range(epochs):
         optimizer.step()
     losses.append(loss.item())
 losses = np.array(losses)
-np.save('./cache/losses.npy', losses)
-torch.save(log_regr.state_dict(), './cache/regression.pt')
+np.save(f"./cache/{configs.dataset_configs['name']}/losses.npy", losses)
+torch.save(log_regr.state_dict(), f"./cache/{configs.dataset_configs['name']}/regression.pt")
 
 # ########## Plot train
 # print(f"Epoch: {epoch}")
 # plt.figure()
 # plt.plot(losses)
 # plt.show()
-
-# plt.figure()
-# density = True
-# w = log_regr.linear.weight.detach()[0].cpu()
-# f = plt.hist(w.numpy(), 100, density=True);
-# plt.hist([w[306].numpy()], bins=f[1], weights=[np.max(f[0])], alpha=0.5);
-# plt.hist([w[8221].numpy()], bins=f[1], weights=[np.max(f[0])], alpha=0.5);
-# plt.legend(['All', 'I', 'Sorry'])
-# plt.show()
-
-# ntopk = 20
-# wtopkids = w.topk(ntopk)[1]
-# for i in wtopkids:
-#     print(f"Id is {i}: {tokenizer.decode(i)}")
-
-# plt.hist(results_tt.flatten().numpy(), 100, density=density, alpha=1/3);
-# plt.hist(results_tt[y_toxicity.logical_not()][:, wtopkids].flatten().numpy(), 100, density=density, alpha=1/3);
-# plt.hist(results_tt[y_toxicity][:, wtopkids].flatten().numpy(), 100, density=density, alpha=1/3);
-# plt.legend(['ALL', 'non-toxic', 'toxic'])
-# plt.show()
-
 ########## Test
 split_name = 'test' # train, test
 content = datas_tt[split_name]['content']
@@ -117,8 +96,8 @@ scores_split = [r2, r1]
 FPR = np.linspace(0, 1, 1001)
 ths = (1e-1, 1e-2, 1e-3, 1e-4)
 metrics = computeMetrics(scores_split, FPR, ths)
-np.save('./cache/metrics', metrics)
-np.savez('./cache/scores_split', r1=r1, r2=r2)
+np.save(f"./cache/{configs.dataset_configs['name']}/metrics", metrics)
+np.savez(f"./cache/{configs.dataset_configs['name']}/scores_split", r1=r1, r2=r2)
 
 y_score = np.concatenate(scores_split)
 y_test = np.concatenate([np.ones_like(scores_split[0]), np.zeros_like(scores_split[1])])
@@ -131,18 +110,20 @@ print(f"Success rate is {metrics['acc_opt']:.4f} with threshold {metrics['thr_op
 print(f"TPRs at low FPR are " + ', '.join([f"{x:.2f}" for x in metrics['TPRs_lowFPR'] * 100]))
 
 # ########## Plot test
-# plt.figure(figsize=(12, 7.5))
+# plt.figure(figsize=(12, 7.5), layout="tight")
 # plt.subplot(2,2,1)
 # for sc in scores_split:
 #     plt.hist(sc, 100, density=True, alpha=0.5);
 # #     plt.xlim([-0.02, 1.02])
 # #     plt.ylim([0, 100])
 # plt.legend(['positives', 'negatives'])
-# plt.title('AUROC is %.4f, success rate is %.4f with threshold %.4f' % (metrics['AUROC'], metrics['acc_opt'], metrics['thr_opt'], ))
+# plt.title('Histogram.AUROC is %.4f, success rate is %.4f with threshold %.4f' % (metrics['AUROC'], metrics['acc_opt'], metrics['thr_opt'], ))
 
 # plt.subplot(2,2,2)
 # plt.plot(metrics['FPR'], metrics['TPR'])
 # plt.plot([0, 1], [0, 1], 'k--')
+# plt.xlabel('FPR')
+# plt.ylabel('TPR')
 
 # plt.subplot(2,2,3)
 # x = np.log(metrics['FPR'])
@@ -152,8 +133,8 @@ print(f"TPRs at low FPR are " + ', '.join([f"{x:.2f}" for x in metrics['TPRs_low
 # ma = max(y[x>-np.Inf].max(), y[y>-np.Inf].max())
 # plt.plot([mi, ma], [mi, ma], 'k--')
 # plt.title(f"TPRs at low FPR are " + ', '.join([f"{x:.2f}" for x in metrics['TPRs_lowFPR'] * 100]))
-# plt.xlabel('FPR')
-# plt.ylabel('TPR')
+# plt.xlabel('log FPR')
+# plt.ylabel('log TPR')
 
 # plt.subplot(2,2,4)
 # y_score = np.concatenate(scores_split)
@@ -167,7 +148,4 @@ print(f"TPRs at low FPR are " + ', '.join([f"{x:.2f}" for x in metrics['TPRs_low
 # plt.ylabel('Precision')
 
 # plt.show()
-# {k: metrics[k] if not k in ['acc_list', 'thr', 'tpr', 'fpr', 'FPR', 'TPR'] else 'collapsed' for k in metrics.keys()}
-
-
-
+# print({k: metrics[k] if not k in ['acc_list', 'thr', 'tpr', 'fpr', 'FPR', 'TPR'] else 'collapsed' for k in metrics.keys()})
